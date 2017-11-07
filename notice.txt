@@ -1,0 +1,10 @@
+hitit 서버 
+
+114.70.192.29
+id/pass
+
+tjrdnjs1609 / rla16051605
+
+폴더 경로
+./bingo
+
