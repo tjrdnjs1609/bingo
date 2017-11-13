@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,7 +35,9 @@ int main(int argc, char **argv)
                 exit(1);
         }
 
-        write(client_socket, argv[1], strlen(argv[1])+1);
+        printf("write massge\n");  //수정 부분
+        scanf(" %[^\n]s", buff);   //수정 부분
+        write(client_socket, buff, BUFF_SIZE);
         read(client_socket, buff, BUFF_SIZE);
         printf("%s\n", buff);
         close(client_socket);
