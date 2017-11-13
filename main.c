@@ -66,6 +66,6 @@ int main(void)
 
                 sprintf(buff_snd, "%d : %s", (int)strlen(buff_rcv), buff_rcv);
                 write(client_socket, buff_snd, strlen(buff_snd)+1);
-                close(client_socket);
+                //close(client_socket);
         }
 }
