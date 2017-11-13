@@ -40,7 +40,7 @@ int main(int argc, char **argv)
         write(client_socket, buff, BUFF_SIZE);
         read(client_socket, buff, BUFF_SIZE);
         printf("%s\n", buff);
-        close(client_socket);
+        //close(client_socket);
 
         return 0;
 }
