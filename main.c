@@ -71,7 +71,7 @@ int main(void)
 }
 
 
-클라이언트
+
 
 #include <stdio.h>
 #include <stdlib.h>
