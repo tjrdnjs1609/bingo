@@ -1,3 +1,6 @@
+//클라이언트 소스코드
+
+//헤더파일 모음 
 #include <ncurses.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,12 +12,13 @@
 #include <stdio.h>
 
 // 클라이언트 설정
-#define TIME 100000
-#define W_ROOM -1
-#define LOGIN_P -2
-#define LOGIN_A -3
-#define LOGIN_F -4
-#define DEBUG 0
+#define TIME 100000//접속 지연 
+#define W_ROOM -1//대기바 번호
+#define LOGIN_P -2//로그인 요청 번호
+#define LOGIN_A -3//중복오류 번호 
+#define LOGIN_F -4//서버가득참 번호 
+#define DEBUG 0//디버그 
+#define PORT 9810//포트 
 
 // 구조체
 // 유저 
@@ -31,37 +35,43 @@ typedef struct w_room
 {
 	int Point_X;// 가리키는 방향 X
 	int Point_Y;// 가리키는 방향 Y
-	int G_Room_Number[10];
-	int G_Room_Access[10];
-	int G_Room_Play[10];
-	int G_Room_Size[10];
-	int G_Room_Score[10];
+	int G_Room_Number[10];// 게임방 번호 
+	int G_Room_Access[10];// 게임방 유저수 
+	int G_Room_Play[10];// 게임방 상태 
+	int G_Room_Size[10];// 게임방 보드판 크기 
+	int G_Room_Score[10];// 게임방 득점수 
 }W_Room_t;
 // 게임방
 typedef struct g_room
 {
-	int Number;
-	int Access;
-	char User_Name[6][100];
-	int User_Number[6];
-	int Board[6][6][6];
-	int Size;
-	int Score;
-	int User_Score[6];
-	int Play;
-	int User_Point[6][2];
-	int Turn;
-	int Win;
+	int Number;// 게임방 번호 
+	int Access;//게임방 유저수 
+	char User_Name[6][100];//유저 이름 
+	int User_Number[6];//유저 번호 
+	int Board[6][6][6];//보드판 
+	int Size;//크기설정 
+	int Score;//득점설정 
+	int User_Score[6];//유저 득점 
+	int Play;//게임상태 
+	int User_Point[6][2];//유저 커서 
+	int Turn;//턴 
+	int Win;//게임 결과 
+	int User_Item[6][3];//유저 아이템 
+	int J;//점프 
+	int Q;//역행 
+	int K;//한번더 
+	int GetItem;//아이템 얻음 
 }G_Room_t;
 
 // 전역 변수
 int Client_Socket;
 struct sockaddr_in Client_Addr;
-int Port = 9000;
+int Port = PORT;
 char Send_Name[256];
 User_t My_User;
 W_Room_t My_W_Room;
 G_Room_t My_G_Room;
+int Temp_Number=0;
 
 // 프로토 타입
 void* Client_Thread_Run();
@@ -97,6 +107,25 @@ int main(void)
 		refresh();
 
 		// 로그인 화면 출력 
+
+		mvprintw( 3,1,"                      ||||||||||||||||||||||||||||||||||                      ");
+		mvprintw( 4,1,"    ,############  ,###|||||||||||||||||||||||||||||||||       ,### ,###      ");
+		mvprintw( 5,1,"    ;############  ;###        ||||        ||||                ;### ;###      ");
+		mvprintw( 6,1,"    ;###''''';###  ''''        ||||        ||||                ;### ;###      ");
+		mvprintw( 7,1,"    ;###     ;###  ;###|||||||||||||||||||||||||||||||||       ;### ;###      ");
+		mvprintw( 8,1,"    ;############# ;###|,###########|,###########|,########### ;### ;###      ");
+		mvprintw( 9,1,"    ;############# ;###|;########### ;########### ;########### ;### ;###      ");
+		mvprintw(10,1,"    ;###'''''';### ;###|;###'''';### ;###'''';### ;###'''';### ;### ;###      ");
+		mvprintw(11,1,"    ;###      ;### ;###|;###   |;### ;###  ||;### ;###||  ;### '''' ''''      ");
+		mvprintw(12,1,"    ;############# ;###|;###   |;### ;########### ;########### ,### ,###      ");
+		mvprintw(13,1,"    ;############# ;###|;###   |;### ;########### ;########### ;### ;###      ");
+		mvprintw(14,1,"    '''''''''''''' ''''|''''||||'''' '''''''';###|'''''''''''' '''' ''''      ");
+		mvprintw(15,1,"                      ||||  |||||||  ,###  ||;###|  ||||                      ");
+		mvprintw(16,1,"                      ||||           ;###########   ||||                      ");
+		mvprintw(17,1,"                      ||||           ;###########   ||||                      ");
+		mvprintw(18,1,"                      |||||||||||||||''''''''''''|||||||                      ");
+		mvprintw(19,1,"                      ||||||||||||||||||||||||||||||||||                      ");
+
 		// 테두리
 		for(a=0; a<80; a++)
 		{
@@ -111,7 +140,7 @@ int main(void)
 
 		// 로그인 이름 입력
 		My_User_Clear();
-		mvprintw(10, 30, "Name : ");
+		mvprintw(20, 30, "Name : ");
 		scanw(" %[^\n]s", My_User.Name);
 
 		// 화면 지우기 
@@ -167,15 +196,15 @@ int main(void)
 		}
 		else if(My_User.Kind == LOGIN_A)
 		{
-			mvprintw(11, 30, "Accessed Name.");
+			mvprintw(21, 30, "Accessed Name.");
 		}
 		else if(My_User.Kind == LOGIN_F)
 		{
-			mvprintw(11, 30, "Server is Full.");
+			mvprintw(21, 30, "Server is Full.");
 		}
 		else
 		{
-			mvprintw(11, 30, "Error.");
+			mvprintw(21, 30, "Error.");
 		}
 	}
 
@@ -202,6 +231,16 @@ void* Client_Thread_Run()
 	while(1)
 	{
 		erase(); // 화면 지우기
+
+		// 깜밖임용 
+		if(Temp_Number < 0)
+		{
+			Temp_Number = 10;
+		}
+		else
+		{
+			Temp_Number--;
+		}
 
 		// 클라이언트 생성
 		Create_Client();
@@ -256,16 +295,23 @@ void* Client_Thread_Run()
 		// 대기방일 때
 		if(My_User.Kind == W_ROOM)
 		{
+			//게임방리스트 작성 
 			for(a=0; a<10; a++)
 			{
+				//없는 방이면 빈칸 출력 , 있는방이면 정보 출력 
 				if(My_W_Room.G_Room_Number[a] == -1)
 					mvprintw(2+a, 15, " ");
 				else
 					mvprintw(2+a, 15, "[%2dRoom : %d/6 Access : %d*%d Size : %d Score : %s ]", My_W_Room.G_Room_Number[a],  My_W_Room.G_Room_Access[a], My_W_Room.G_Room_Size[a], My_W_Room.G_Room_Size[a], My_W_Room.G_Room_Score[a], (My_W_Room.G_Room_Play[a] == 0)? "Wait" : "Play");
 			}
+			//게임방 커서 
 			mvprintw(My_W_Room.Point_Y+2, 15, "@");
 			mvprintw(My_W_Room.Point_Y+2, 64, "@");
 
+			//리스트 페이지
+			mvprintw(12, 37, "< %d >", My_W_Room.Point_X+1);
+
+			//대기방 화면 출력  
 			for(a=1; a<23; a++)
 			{
 				mvprintw(a, 13, "|");
@@ -280,100 +326,270 @@ void* Client_Thread_Run()
 			mvprintw(0, 34, "[Wait Room]");
 			mvprintw(13, 34, "[Game Key]");
 
-			mvprintw(16, 29, "   [w]    [r]  [o]");
-			mvprintw(17, 29, "[a][s][d] [f]  [Enter]");
+			mvprintw(15, 17, "[1][2][3]                     1:use item1    ");
+			mvprintw(16, 17, "   [w]    [r]  [o]            2:use item2    ");
+			mvprintw(17, 17, "[a][s][d] [f]  [Enter]        3:use item3    ");
 
 			mvprintw(19, 17, "w:up   s:down  r:change size  o:out game room");
-			mvprintw(20, 17, "a:left d:right f:change score ");
+			mvprintw(20, 17, "a:left d:right f:change score S:game start");
 			mvprintw(21, 17, "Enter:join game room, erase number");
 		}
 
 		// 게임방일 때
 		if(My_User.Kind >= 0)
 		{
-			mvprintw(0, 0, "[ %2dRoom : %d/6 Access : %d*%d Size : %d Score : %s ]", My_G_Room.Number, My_G_Room.Access, My_G_Room.Size, My_G_Room.Size, My_G_Room.Score, (My_G_Room.Play == 0)? "Wait" : "Play");
+			//게임방 정보 
+			mvprintw(0, 15, "[%2dRoom : %d/6 Access : %d*%d Size : %d Score : %s ]", My_G_Room.Number, My_G_Room.Access, My_G_Room.Size, My_G_Room.Size, My_G_Room.Score, (My_G_Room.Play == 0)? "Wait" : "Play");
 			
+			//1~3번째 유저 이름, 보드판, 득점, 아이템 출력 
 			for(a=0; a<3; a++)
 			{
-				mvprintw(2, 2+a*20, "%s", My_G_Room.User_Name[a]);
+				//유저 이름 
+				mvprintw(1, 1+a*20, "%s", My_G_Room.User_Name[a]);
 				for(b=0; b<6; b++)
 				{
 					for(c=0; c<6; c++)
 					{
+						//보드판 커서 
 						if(My_G_Room.User_Point[a][0] == c && My_G_Room.User_Point[a][1] == b)
 						{
-							mvprintw(3+b, 3+a*20+c*3-1, "[");
-							mvprintw(3+b, 3+a*20+c*3+2, "]");
+							mvprintw(2+b, 2+a*20+c*3-1, "[");
+							mvprintw(2+b, 2+a*20+c*3+2, "]");
 						}
 						if(b >= My_G_Room.Size || c >= My_G_Room.Size)
 						{
-							mvprintw(3+b, 3+a*20+c*3, "  ");
+							mvprintw(2+b, 2+a*20+c*3, "  ");//쓰지않는 보드판은 빈칸 
 						}
 						else if(My_G_Room.Board[a][c][b] == 0)
 						{
-							mvprintw(3+b, 3+a*20+c*3, "--");
+							mvprintw(2+b, 2+a*20+c*3, "--");//0은 지운칸 
 						}
-						else if(My_G_Room.User_Number[a] == My_User.Number)
+						else if(My_G_Room.User_Number[a] == My_User.Number)//0이 아니고 자신의 보드판이면 숫자 출력
 						{
-							mvprintw(3+b, 3+a*20+c*3, "%2d", My_G_Room.Board[a][c][b]);
+							if(My_G_Room.Board[a][c][b] == My_G_Room.Board[a][My_G_Room.User_Point[a][0]][My_G_Room.User_Point[a][1]])
+							{
+								if(Temp_Number < 5)
+								{
+									mvprintw(2+b, 2+a*20+c*3, "%2d", My_G_Room.Board[a][c][b]);
+								}
+								else
+								{
+									mvprintw(2+b, 2+a*20+c*3, " ");
+								}
+							}
+							else
+							{
+								mvprintw(2+b, 2+a*20+c*3, "%2d", My_G_Room.Board[a][c][b]); 
+							}
 						}
 						else
 						{
-							mvprintw(3+b, 3+a*20+c*3, "[]");
+							mvprintw(2+b, 2+a*20+c*3, "[]");//다른유저 보드판은 0빼고 가림 
 						}
 					}
 				}
-				mvprintw(9, 2+a*20, "Score : %d", My_G_Room.User_Score[a]);
+				//득점, 아이템 
+				mvprintw(8, 1+a*20, "Score : %d", My_G_Room.User_Score[a]);
+				mvprintw(9, 1+a*20, "Item  : ");
+				for(b=0; b<3; b++)
+				{
+					switch(My_G_Room.User_Item[a][b])
+					{
+					case 0:
+						mvprintw(9, 9+a*20+b*4, "[ ]");//빈칸 
+						break;
+					case 1:
+						mvprintw(9, 9+a*20+b*4, "[J]");//점프 
+						break;
+					case 2:
+						mvprintw(9, 9+a*20+b*4, "[Q]");//역행 
+						break;
+					case 3:
+						mvprintw(9, 9+a*20+b*4, "[K]");//한번더 
+						break;
+					}
+				}
 			}
 
+			// 6~4번째 유저 정보 출력, 위외 같음 
 			for(a=3; a<6; a++)
 			{
-				mvprintw(12, 2+(a-3)*20, "%s", My_G_Room.User_Name[8-a]);
+				mvprintw(14, 1+(a-3)*20, "%s", My_G_Room.User_Name[8-a]);
 				for(b=0; b<6; b++)
 				{
 					for(c=0; c<6; c++)
 					{
 						if(My_G_Room.User_Point[8-a][0] == c && My_G_Room.User_Point[8-a][1] == b)
 						{
-							mvprintw(13+b, 3+(a-3)*20+c*3-1, "[");
-							mvprintw(13+b, 3+(a-3)*20+c*3+2, "]");
+							mvprintw(15+b, 2+(a-3)*20+c*3-1, "[");
+							mvprintw(15+b, 2+(a-3)*20+c*3+2, "]");
 						}
 						if(b >= My_G_Room.Size || c >= My_G_Room.Size)
 						{
-							mvprintw(13+b, 3+(a-3)*20+c*3, "  ");
+							mvprintw(15+b, 2+(a-3)*20+c*3, "  ");
 						}
 						else if(My_G_Room.Board[8-a][c][b] == 0)
 						{
-							mvprintw(13+b, 3+(a-3)*20+c*3, "--");
+							mvprintw(15+b, 2+(a-3)*20+c*3, "--");
 						}
 						else if(My_G_Room.User_Number[8-a] == My_User.Number)
 						{
-							mvprintw(13+b, 3+(a-3)*20+c*3, "%2d", My_G_Room.Board[8-a][c][b]);
+							if(My_G_Room.Board[8-a][c][b] == My_G_Room.Board[8-a][My_G_Room.User_Point[8-a][0]][My_G_Room.User_Point[8-a][1]])
+							{
+								if(Temp_Number < 5)
+								{
+									mvprintw(15+b, 2+(a-3)*20+c*3, "%2d", My_G_Room.Board[8-a][c][b]);
+								}
+								else
+								{
+									mvprintw(15+b, 2+(a-3)*20+c*3, " ");
+								}
+							}
+							else
+							{
+								mvprintw(15+b, 2+(a-3)*20+c*3, "%2d", My_G_Room.Board[8-a][c][b]); 
+							}
 						}
 						else
 						{
-							mvprintw(13+b, 3+(a-3)*20+c*3, "[]");
+							mvprintw(15+b, 2+(a-3)*20+c*3, "[]");
 						}
 					}
 				}
-				mvprintw(19, 2+(a-3)*20, "Score : %d", My_G_Room.User_Score[8-a]);
+				mvprintw(21, 1+(a-3)*20, "Score : %d", My_G_Room.User_Score[8-a]);
+				mvprintw(22, 1+(a-3)*20, "Item  : ");
+				for(b=0; b<3; b++)
+				{
+					switch(My_G_Room.User_Item[8-a][b])
+					{
+					case 0:
+						mvprintw(22, 9+(a-3)*20+b*4, "[ ]");
+						break;
+					case 1:
+						mvprintw(22, 9+(a-3)*20+b*4, "[J]");
+						break;
+					case 2:
+						mvprintw(22, 9+(a-3)*20+b*4, "[Q]");
+						break;
+					case 3:
+						mvprintw(22, 9+(a-3)*20+b*4, "[K]");
+						break;
+					}
+				}
 			}
+
+			// 게임방 테두리
+			for(a=1; a<23; a++)
+			{
+				mvprintw(a, 20, "|");
+				mvprintw(a, 40, "|");
+				mvprintw(a, 60, "|");
+			}
+			for(a=1; a<60; a++)
+			{
+				mvprintw(10, a, "-");
+				mvprintw(11, a, " ");
+				mvprintw(12, a, " ");
+				mvprintw(13, a, "-");
+			}
+
+			// 아이템 설명
+			mvprintw(1, 61, "[Item]");
+			mvprintw(2, 61, " J: jump turn.");
+			mvprintw(3, 61, " Q: reverse turn.");
+			mvprintw(4, 61, " K: one more.");
+
+			mvprintw(6, 61, "[Game Key]");
+			mvprintw(7, 61, " w: up.");
+			mvprintw(8, 61, " s: down.");
+			mvprintw(9, 61, " a: left.");
+			mvprintw(10, 61, " d: right.");
+			mvprintw(11, 61, " enter:");
+			mvprintw(12, 61, "  erase number.");
+			mvprintw(13, 61, " 1: use item1.");
+			mvprintw(14, 61, " 2: use item2.");
+			mvprintw(15, 61, " 3: use item3.");
+			mvprintw(16, 61, " o: game room out.");
+
+			mvprintw(18, 61, "[Owner]");
+			mvprintw(19, 61, " S: start game.");
+			mvprintw(20, 61, " r: change size.");
+			mvprintw(21, 61, " f: change score.");
+
 			//시스템 메세지
 			if(My_G_Room.Play == 1)
 			{
-				mvprintw(22, 2, "[System] : %s Turn", My_G_Room.User_Name[My_G_Room.Turn]);
+				mvprintw(11, 22, "%s\t Turn!!", My_G_Room.User_Name[My_G_Room.Turn]);//다음턴 
 			}
 			else if(My_G_Room.Win == 6)
 			{
-				mvprintw(22, 2, "[System] : Drow!!");
+				mvprintw(11, 27, "Drow!!");//무승부 
 			}
 			else if(My_G_Room.Win >= 0 && My_G_Room.Win <=5)
 			{
-				mvprintw(22, 2, "[System] : %s Win!!", My_G_Room.User_Name[My_G_Room.Win]);
+				mvprintw(11, 22, "%s\t Win!!", My_G_Room.User_Name[My_G_Room.Win]);//이김 
 			}
 			else
 			{
-				mvprintw(22, 2, "[System] : ");
+				mvprintw(11, 26, " ");//그외 
+			}
+
+			if(My_G_Room.Play == 1)
+			{
+				if(My_G_Room.J != 0)
+				{
+					mvprintw(11, 6, " Jump*%d!! ", My_G_Room.J);//점프아이템 사용 
+				}
+				if(My_G_Room.K != 0)
+				{
+					mvprintw(12, 6, " More*%d!! ", My_G_Room.K);//한번더 사용 
+				}
+				if(My_G_Room.Q == 1)
+				{
+					mvprintw(11, 46, "  .-->  ");//순행 
+					mvprintw(12, 46, "  <--'  ");
+				}
+				else
+				{
+					mvprintw(11, 46, "  <--.  ");//역행 
+					mvprintw(12, 46, "  '-->  ");
+				}
+				if(My_G_Room.GetItem == 1)
+				{
+					mvprintw(12, 26, "Item Get!!");//아이템 얻음 
+				}
+			}
+
+			// 방장 표시
+			if(My_G_Room.Play == 0)
+			{
+				mvprintw(10, 6, "[ Owner ]");
+			}
+
+			// 턴 표시
+			if(My_G_Room.Play == 1)
+			{
+			switch(My_G_Room.Turn)
+			{
+				case 0:
+					mvprintw(10, 6, "[Turn!!]");
+					break;
+				case 1:
+					mvprintw(10, 26, "[Turn!!]");
+					break;
+				case 2:
+					mvprintw(10, 46, "[Turn!!]");
+					break;
+				case 3:
+					mvprintw(13, 46, "[Turn!!]");
+					break;
+				case 4:
+					mvprintw(13, 26, "[Turn!!]");
+					break;
+				case 5:
+					mvprintw(13, 6, "[Turn!!]");
+					break;
+				}
 			}
 		}
 
